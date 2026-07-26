@@ -143,16 +143,6 @@ def ask_gemini(chat_id, user_text, file_bytes=None, mime_type=None):
         "contents": request_contents
     }
 
-            ]
-
-        },
-
-
-        "contents": request_contents
-
-    }
-
-
 
     req = urllib.request.Request(
 
