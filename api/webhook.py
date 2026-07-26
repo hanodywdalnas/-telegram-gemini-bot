@@ -101,23 +101,19 @@ def ask_gemini(chat_id, user_text, file_bytes=None, mime_type=None):
 
 
     if file_bytes:
-
         request_parts.append(
             {
                 "inline_data": {
-
                     "mime_type": mime_type,
-
                     "data": base64.b64encode(
                         file_bytes
                     ).decode("utf-8")
-
                 }
             }
         )
 
 
-        request_parts.append(
+    request_parts.append(
         {
             "text": user_text or "حلل هذا الملف أكاديمياً."
         }
