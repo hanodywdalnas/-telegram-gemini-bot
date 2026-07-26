@@ -25,14 +25,19 @@ SYSTEM_INSTRUCTION = """أنت مساعد متخصص في التصميم الد�
 استخدم عناوين واضحة لكل مشروع، وحافظ على الإيجاز، بدون حشو أو تكرار."""
 
 
-def ask_gemini(user_text):
+CONVERSATION_HISTORY = {}
+MAX_HISTORY_MESSAGES = 10
+
+
+def ask_gemini(chat_id, user_text):
+    history = CONVERSATION_HISTORY.get(chat_id, [])
+    history.append({"role": "user", "parts": [{"text": user_text}]})
+
     payload = {
         "system_instruction": {
             "parts": [{"text": SYSTEM_INSTRUCTION}]
         },
-        "contents": [
-            {"parts": [{"text": user_text}]}
-        ]
+        "contents": history
     }
     req = urllib.request.Request(
         GEMINI_API,
@@ -46,7 +51,10 @@ def ask_gemini(user_text):
     try:
         with urllib.request.urlopen(req, timeout=20) as resp:
             data = json.loads(resp.read().decode("utf-8"))
-        return data["candidates"][0]["content"]["parts"][0]["text"]
+        reply_text = data["candidates"][0]["content"]["parts"][0]["text"]
+        history.append({"role": "model", "parts": [{"text": reply_text}]})
+        CONVERSATION_HISTORY[chat_id] = history[-MAX_HISTORY_MESSAGES:]
+        return reply_text
     except urllib.error.HTTPError as e:
         error_body = e.read().decode("utf-8")
         return f"خطأ HTTP {e.code}: {error_body}"
@@ -78,7 +86,7 @@ class handler(BaseHTTPRequestHandler):
             text = message.get("text", "")
 
             if chat_id and text:
-                reply = ask_gemini(text)
+                reply = ask_gemini(chat_id, text)
                 send_telegram_message(chat_id, reply)
         except Exception as e:
             pass
