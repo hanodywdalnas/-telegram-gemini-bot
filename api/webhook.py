@@ -134,7 +134,8 @@ def ask_gemini(chat_id, user_text, file_bytes=None, mime_type=None):
             "parts": request_parts
 
         }
-    payload = {
+
+    ]    payload = {
 
         "system_instruction": {
 
@@ -296,9 +297,7 @@ def send_telegram_message(chat_id, text):
 
     with urllib.request.urlopen(req, timeout=20) as resp:
 
-        resp.read()
-    ]
-    class handler(BaseHTTPRequestHandler):
+        resp.read()class handler(BaseHTTPRequestHandler):
 
 
     def do_POST(self):
