@@ -1,70 +1,4 @@
-from http.server import BaseHTTPRequestHandler
-import json
-import os
-import urllib.request
-import urllib.error
-
-TELEGRAM_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
-GEMINI_KEY = os.environ.get("GEMINI_API_KEY")
-
-TELEGRAM_API = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-GEMINI_API = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent"
-
-
-SYSTEM_INSTRUCTION = """أنت مساعد متخصص في التصميم الداخلي، موجه لطلاب وممارسي التصميم الداخلي.
-تجيب فقط عن أسئلة متعلقة بـ: التصميم الداخلي، الأثاث، الإضاءة، الألوان، المساحات السكنية والتجارية، تاريخ التصميم، البرمجيات المستخدمة في التصميم، والمواد.
-إذا سُئلت عن موضوع خارج هذا المجال، اعتذر بلطف ووجه المستخدم للسؤال عن شيء متعلق بالتصميم الداخلي.
-أجب بإيجاز ووضوح، بدون مقدمات طويلة.
-
-عندما يرسل المستخدم وصف ثلاثة مشاريع تصميم داخلي ويطلب منك المقارنة بينها، اتبع هذا الهيكل بالضبط:
-
-1. تحليل مختصر لكل مشروع على حدة: نقاط القوة، ثم نقاط الضعف.
-2. اختيار المشروع الأفضل، مع ذكر السبب الرئيسي للاختيار بجملتين كحد أقصى.
-3. لكل مشروع، اقتراح تطوير عملي واحد أو اثنين، قابل للتنفيذ.
-
-استخدم عناوين واضحة لكل مشروع، وحافظ على الإيجاز، بدون حشو أو تكرار."""
-
-
-CONVERSATION_HISTORY = {}
-MAX_HISTORY_MESSAGES = 10
-
-
-def ask_gemini(chat_id, user_text):
-    history = CONVERSATION_HISTORY.get(chat_id, [])
-    history.append({"role": "user", "parts": [{"text": user_text}]})
-
-    payload = {
-        "system_instruction": {
-            "parts": [{"text": SYSTEM_INSTRUCTION}]
-        },
-        "contents": history
-    }
-    req = urllib.request.Request(
-        GEMINI_API,
-        data=json.dumps(payload).encode("utf-8"),
-        headers={
-            "Content-Type": "application/json",
-            "x-goog-api-key": GEMINI_KEY,
-        },
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=20) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-        reply_text = data["candidates"][0]["content"]["parts"][0]["text"]
-        history.append({"role": "model", "parts": [{"text": reply_text}]})
-        CONVERSATION_HISTORY[chat_id] = history[-MAX_HISTORY_MESSAGES:]
-        return reply_text
-    except urllib.error.HTTPError as e:
-        error_body = e.read().decode("utf-8")
-        return f"خطأ HTTP {e.code}: {error_body}"
-    except Exception as e:
-        return f"حدث خطأ أثناء الاتصال بـ Gemini: {e}"
-
-
-def send_telegram_message(chat_id, text):
-    payload = {"chat_id": chat_id, "text": text}
-    req = urllib.request.Request(
+req = urllib.request.Request(
         TELEGRAM_API,
         data=json.dumps(payload).encode("utf-8"),
         headers={"Content-Type": "application/json"},
@@ -83,10 +17,24 @@ class handler(BaseHTTPRequestHandler):
             update = json.loads(body)
             message = update.get("message", {})
             chat_id = message.get("chat", {}).get("id")
-            text = message.get("text", "")
+            text = message.get("text", "") or message.get("caption", "")
+            document = message.get("document")
+            photos = message.get("photo")
 
-            if chat_id and text:
-                reply = ask_gemini(chat_id, text)
+            file_bytes = None
+            mime_type = None
+
+            if chat_id and document:
+                file_id = document.get("file_id")
+                mime_type = document.get("mime_type") or "application/octet-stream"
+                file_bytes, _ = get_telegram_file(file_id)
+            elif chat_id and photos:
+                file_id = photos[-1].get("file_id")
+                file_bytes, file_path = get_telegram_file(file_id)
+                mime_type = guess_mime_type(file_path)
+
+            if chat_id and (text or file_bytes):
+                reply = ask_gemini(chat_id, text, file_bytes=file_bytes, mime_type=mime_type)
                 send_telegram_message(chat_id, reply)
         except Exception as e:
             pass
