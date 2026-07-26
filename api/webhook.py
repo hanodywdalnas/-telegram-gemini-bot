@@ -2,6 +2,7 @@ from http.server import BaseHTTPRequestHandler
 import json
 import os
 import urllib.request
+import urllib.error
 
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY")
@@ -29,6 +30,9 @@ def ask_gemini(user_text):
         with urllib.request.urlopen(req, timeout=20) as resp:
             data = json.loads(resp.read().decode("utf-8"))
         return data["candidates"][0]["content"]["parts"][0]["text"]
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode("utf-8")
+        return f"خطأ HTTP {e.code}: {error_body}"
     except Exception as e:
         return f"حدث خطأ أثناء الاتصال بـ Gemini: {e}"
 
