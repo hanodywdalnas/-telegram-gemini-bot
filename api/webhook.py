@@ -132,16 +132,16 @@ def ask_gemini(chat_id, user_text, file_bytes=None, mime_type=None):
     ]
 
 
-    payload = {   payload = {
+    payload = {
         "system_instruction": {
-
             "parts": [
-
                 {
-
                     "text": SYSTEM_INSTRUCTION
-
                 }
+            ]
+        },
+        "contents": request_contents
+    }
 
             ]
 
