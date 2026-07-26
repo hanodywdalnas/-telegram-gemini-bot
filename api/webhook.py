@@ -16,18 +16,16 @@ TELEGRAM_API = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
 TELEGRAM_GET_FILE_API = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getFile"
 TELEGRAM_FILE_BASE = f"https://api.telegram.org/file/bot{TELEGRAM_TOKEN}/"
 
+
 GEMINI_API = (
     "https://generativelanguage.googleapis.com/v1beta/"
     "models/gemini-flash-latest:generateContent"
 )
 
 
-MAX_HISTORY_MESSAGES = 20
-MAX_RESPONSE_TOKENS = 4096
-MAX_FILE_SIZE = 20 * 1024 * 1024
-
-
 CONVERSATION_HISTORY = {}
+
+MAX_HISTORY_MESSAGES = 10
 
 
 
@@ -36,14 +34,20 @@ def get_telegram_file(file_id):
     url = f"{TELEGRAM_GET_FILE_API}?file_id={file_id}"
 
     with urllib.request.urlopen(url, timeout=20) as resp:
-        data = json.loads(resp.read().decode("utf-8"))
+        data = json.loads(
+            resp.read().decode("utf-8")
+        )
+
 
     file_path = data["result"]["file_path"]
 
+
     file_url = TELEGRAM_FILE_BASE + file_path
+
 
     with urllib.request.urlopen(file_url, timeout=30) as resp:
         file_bytes = resp.read()
+
 
     return file_bytes, file_path
 
@@ -57,23 +61,40 @@ def guess_mime_type(file_path):
         else ""
     )
 
+
     mapping = {
+
         "pdf": "application/pdf",
+
         "jpg": "image/jpeg",
+
         "jpeg": "image/jpeg",
+
         "png": "image/png",
+
         "webp": "image/webp",
-        "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+
+        "docx":
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+
         "txt": "text/plain",
+
     }
 
-    return mapping.get(ext, "application/octet-stream")
+
+    return mapping.get(
+        ext,
+        "application/octet-stream"
+    )
 
 
 
 def ask_gemini(chat_id, user_text, file_bytes=None, mime_type=None):
 
-    history = CONVERSATION_HISTORY.get(chat_id, [])
+    history = CONVERSATION_HISTORY.get(
+        chat_id,
+        []
+    )
 
 
     request_parts = []
@@ -84,54 +105,56 @@ def ask_gemini(chat_id, user_text, file_bytes=None, mime_type=None):
         request_parts.append(
             {
                 "inline_data": {
+
                     "mime_type": mime_type,
-                    "data": base64.b64encode(file_bytes).decode("utf-8"),
+
+                    "data": base64.b64encode(
+                        file_bytes
+                    ).decode("utf-8")
+
                 }
             }
         )
 
 
-    display_text = user_text or "حلل هذا الملف بصورة أكاديمية."
-
-
     request_parts.append(
         {
-            "text": display_text
+            "text":
+            user_text or "حلل هذا الملف أكاديمياً."
         }
     )
 
 
     request_contents = history + [
+
         {
+
             "role": "user",
+
             "parts": request_parts
+
         }
-    ]
-
-
     payload = {
 
         "system_instruction": {
+
             "parts": [
+
                 {
+
                     "text": SYSTEM_INSTRUCTION
+
                 }
+
             ]
+
         },
 
-        "contents": request_contents,
 
-
-        "generationConfig": {
-
-            "temperature": 0.3,
-            "topP": 0.9,
-            "topK": 40,
-            "maxOutputTokens": MAX_RESPONSE_TOKENS
-
-        }
+        "contents": request_contents
 
     }
+
 
 
     req = urllib.request.Request(
@@ -141,13 +164,17 @@ def ask_gemini(chat_id, user_text, file_bytes=None, mime_type=None):
         data=json.dumps(payload).encode("utf-8"),
 
         headers={
+
             "Content-Type": "application/json",
-            "x-goog-api-key": GEMINI_KEY,
+
+            "x-goog-api-key": GEMINI_KEY
+
         },
 
-        method="POST",
+        method="POST"
 
     )
+
 
 
     try:
@@ -160,39 +187,52 @@ def ask_gemini(chat_id, user_text, file_bytes=None, mime_type=None):
 
 
         reply_text = (
+
             data["candidates"][0]
             ["content"]["parts"][0]["text"]
-        )
 
-
-        history_note = (
-            display_text
-            if not file_bytes
-            else f"[أرسل المستخدم ملفاً] {display_text}"
         )
 
 
         history.append(
+
             {
+
                 "role": "user",
+
                 "parts": [
+
                     {
-                        "text": history_note
+
+                        "text": user_text
+
                     }
+
                 ]
+
             }
+
         )
 
 
         history.append(
+
             {
+
                 "role": "model",
+
                 "parts": [
+
                     {
+
                         "text": reply_text
+
                     }
+
                 ]
+
             }
+
         )
 
 
@@ -204,19 +244,36 @@ def ask_gemini(chat_id, user_text, file_bytes=None, mime_type=None):
         return reply_text
 
 
+
     except urllib.error.HTTPError as e:
 
+
         error_body = e.read().decode("utf-8")
+
 
         return f"خطأ HTTP {e.code}: {error_body}"
 
 
-    except Exception as e:def send_telegram_message(chat_id, text):
+
+    except Exception as e:
+
+
+        return f"حدث خطأ أثناء الاتصال بـ Gemini: {e}"
+
+
+
+
+def send_telegram_message(chat_id, text):
+
 
     payload = {
+
         "chat_id": chat_id,
+
         "text": text
+
     }
+
 
 
     req = urllib.request.Request(
@@ -226,30 +283,37 @@ def ask_gemini(chat_id, user_text, file_bytes=None, mime_type=None):
         data=json.dumps(payload).encode("utf-8"),
 
         headers={
+
             "Content-Type": "application/json"
+
         },
 
-        method="POST",
+        method="POST"
 
     )
+
 
 
     with urllib.request.urlopen(req, timeout=20) as resp:
 
         resp.read()
-
-
-
-class handler(BaseHTTPRequestHandler):
+    ]
+    class handler(BaseHTTPRequestHandler):
 
 
     def do_POST(self):
 
         content_length = int(
-            self.headers.get("Content-Length", 0)
+            self.headers.get(
+                "Content-Length",
+                0
+            )
         )
 
-        body = self.rfile.read(content_length)
+
+        body = self.rfile.read(
+            content_length
+        )
 
 
         try:
@@ -257,7 +321,10 @@ class handler(BaseHTTPRequestHandler):
             update = json.loads(body)
 
 
-            message = update.get("message", {})
+            message = update.get(
+                "message",
+                {}
+            )
 
 
             chat_id = (
@@ -273,10 +340,14 @@ class handler(BaseHTTPRequestHandler):
             )
 
 
-            document = message.get("document")
+            document = message.get(
+                "document"
+            )
 
 
-            photos = message.get("photo")
+            photos = message.get(
+                "photo"
+            )
 
 
             file_bytes = None
@@ -288,17 +359,23 @@ class handler(BaseHTTPRequestHandler):
             if chat_id and document:
 
 
-                file_id = document.get("file_id")
-
-
-                mime_type = (
-                    document.get("mime_type")
-                    or "application/octet-stream"
+                file_id = document.get(
+                    "file_id"
                 )
 
 
-                file_bytes, _ = get_telegram_file(
+                file_bytes, file_path = get_telegram_file(
                     file_id
+                )
+
+
+                mime_type = (
+                    document.get(
+                        "mime_type"
+                    )
+                    or guess_mime_type(
+                        file_path
+                    )
                 )
 
 
@@ -306,7 +383,9 @@ class handler(BaseHTTPRequestHandler):
             elif chat_id and photos:
 
 
-                file_id = photos[-1].get("file_id")
+                file_id = photos[-1].get(
+                    "file_id"
+                )
 
 
                 file_bytes, file_path = get_telegram_file(
@@ -320,27 +399,16 @@ class handler(BaseHTTPRequestHandler):
 
 
 
-            if file_bytes and len(file_bytes) > MAX_FILE_SIZE:
+            if chat_id and (
+                text or file_bytes
+            ):
 
 
                 send_telegram_message(
 
                     chat_id,
 
-                    "❌ حجم الملف أكبر من 20MB. يرجى إرسال ملف أصغر."
-
-                )
-
-
-
-            elif chat_id and (text or file_bytes):
-
-
-                send_telegram_message(
-
-                    chat_id,
-
-                    "📄 جاري تحليل المشروع..."
+                    "📄 جاري تحليل الطلب..."
 
                 )
 
@@ -374,15 +442,18 @@ class handler(BaseHTTPRequestHandler):
 
 
 
-        self.send_response(200)
+        self.send_response(
+            200
+        )
+
 
         self.send_header(
             "Content-Type",
             "application/json"
         )
 
-        self.end_headers()
 
+        self.end_headers()
 
 
         self.wfile.write(
@@ -397,10 +468,12 @@ class handler(BaseHTTPRequestHandler):
 
 
 
+
     def do_GET(self):
 
-
-        self.send_response(200)
+        self.send_response(
+            200
+        )
 
 
         self.send_header(
@@ -412,10 +485,9 @@ class handler(BaseHTTPRequestHandler):
         self.end_headers()
 
 
-
         tg_status = (
 
-            f"SET (starts with {TELEGRAM_TOKEN[:6]})"
+            "SET"
 
             if TELEGRAM_TOKEN
 
@@ -424,10 +496,9 @@ class handler(BaseHTTPRequestHandler):
         )
 
 
-
         gm_status = (
 
-            f"SET (starts with {GEMINI_KEY[:6]})"
+            "SET"
 
             if GEMINI_KEY
 
@@ -436,8 +507,7 @@ class handler(BaseHTTPRequestHandler):
         )
 
 
-
-        debug_text = (
+        response = (
 
             "Bot webhook is running.\n"
 
@@ -448,11 +518,6 @@ class handler(BaseHTTPRequestHandler):
         )
 
 
-
         self.wfile.write(
-
-            debug_text.encode("utf-8")
-
+            response.encode("utf-8")
         )
-
-        return f"حدث خطأ أثناء الاتصال بـ Gemini: {e}"
