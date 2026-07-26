@@ -89,7 +89,7 @@ def ask_gemini(chat_id, user_text, file_bytes=None, mime_type=None):
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=20) as resp:
+        with urllib.request.urlopen(req, timeout=90) as resp:
             data = json.loads(resp.read().decode("utf-8"))
         reply_text = data["candidates"][0]["content"]["parts"][0]["text"]
         history_note = display_text if not file_bytes else f"[أرسل المستخدم ملفاً] {display_text}"
