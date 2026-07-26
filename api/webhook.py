@@ -125,17 +125,12 @@ def ask_gemini(chat_id, user_text, file_bytes=None, mime_type=None):
     )
 
 
-    request_contents = history + [
-
-    {
-
-        "role": "user",
-
-        "parts": request_parts
-
-    }
-
-]
+        request_contents = history + [
+        {
+            "role": "user",
+            "parts": request_parts
+        }
+    ]]
 
 
     payload = {
