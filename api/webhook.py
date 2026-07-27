@@ -11,7 +11,7 @@ GEMINI_KEY = os.environ.get("GEMINI_API_KEY")
 TELEGRAM_API = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
 TELEGRAM_GET_FILE_API = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getFile"
 TELEGRAM_FILE_BASE = f"https://api.telegram.org/file/bot{TELEGRAM_TOKEN}/"
-GEMINI_API = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent"
+GEMINI_API = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent"
 
 
 SYSTEM_INSTRUCTION = """أنت أستاذ جامعي متخصص في التصميم الداخلي، وخبير في الإشراف على مشاريع التخرج وتحكيمها، وتمتلك خبرة طويلة في تقييم مشاريع التصميم الداخلي وفق المعايير الأكاديمية الدولية.
